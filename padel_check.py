@@ -238,7 +238,7 @@ def main() -> int:
     # Onthoud wat nu vrij is; een baan die weer bezet raakt en later vrijkomt wordt opnieuw gemeld.
     state["available"] = sorted(current)
     state["failures"] = 0
-    state["last_run"] = dt.datetime.now().isoformat(timespec="seconds")
+    state.pop("last_run", None)  # niet opslaan: zou elke run een commit opleveren
     save_state(state)
     return 0
 
