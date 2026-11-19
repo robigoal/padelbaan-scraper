@@ -182,9 +182,12 @@ async function load() {
   const btn = $("refresh");
   btn.disabled = true; btn.textContent = "Bezig…";
   try {
-    const [data, last] = await Promise.all([fetchData(), fetchLastCheck()]);
+    const minWait = new Promise((r) => setTimeout(r, 600)); // zodat je ziet dat er iets gebeurt
+    const [data, last] = await Promise.all([fetchData(), fetchLastCheck(), minWait]);
     render(data);
-    $("checked").textContent = last ? `Laatste check: ${ago(last)}` : "Laatste check: onbekend";
+    const now = new Date().toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+    $("checked").innerHTML = (last ? `Laatste check: ${ago(last)}` : "Laatste check: onbekend")
+      + `<br><small style="opacity:.75">Opgehaald om ${now}</small>`;
   } catch (e) {
     $("days").innerHTML = `<p class="msg err">Kon de gegevens niet ophalen. Controleer je verbinding.</p>`;
     $("checked").textContent = "Offline";
