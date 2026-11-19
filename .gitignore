@@ -1,0 +1,4 @@
+.env
+*.log
+*.plist
+__pycache__/
