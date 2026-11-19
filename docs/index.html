@@ -69,7 +69,7 @@
   .none { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
   .slot-club { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .links { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
-  .links a { color: inherit; margin-right: 10px; white-space: nowrap; }
+  .links a { color: inherit; display: inline-block; margin: 4px 12px 0 0; white-space: nowrap; }
   .notice { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
   .none a { color: inherit; }
   .how {
@@ -184,9 +184,9 @@ function render(data) {
           </div>`).join("")
       : `<p class="none">Geen dubbelbaan vrij om ${esc((data.start_times || []).join(", "))}.</p>`;
     const links = (day.links || []).map((l) =>
-      `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.club)}${l.auto ? "" : "*"}</a>`).join("");
+      `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.club)}${l.auto ? "" : "*"}</a>`).join(" ");
     return `<section class="day"><div class="day-head"><h2>${esc(dayLabel(day))}</h2>${badge}</div>${body}`
-      + (links ? `<div class="links">Zelf kijken: ${links}</div>` : "") + `</section>`;
+      + (links ? `<div class="links">Zelf kijken:<br>${links}</div>` : "") + `</section>`;
   }).join("");
 }
 
