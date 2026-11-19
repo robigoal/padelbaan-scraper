@@ -1,0 +1,39 @@
+{
+  "club_url": "https://meetandplay.nl/club/88192",
+  "start_times": [
+    "20:00",
+    "20:30",
+    "21:00"
+  ],
+  "days": [
+    {
+      "date": "19-11-2026",
+      "iso": "2026-11-19",
+      "weekday": "donderdag",
+      "booking_url": "https://meetandplay.nl/club/88192?date=19-11-2026&sport=padel&dayPart=evening",
+      "slots": []
+    },
+    {
+      "date": "25-11-2026",
+      "iso": "2026-11-25",
+      "weekday": "woensdag",
+      "booking_url": "https://meetandplay.nl/club/88192?date=25-11-2026&sport=padel&dayPart=evening",
+      "slots": [
+        {
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "duration": "60 minuten",
+          "court": "P4 Heineken 0.0 Padelbaan 4",
+          "price": "€ 37,50"
+        }
+      ]
+    },
+    {
+      "date": "26-11-2026",
+      "iso": "2026-11-26",
+      "weekday": "donderdag",
+      "booking_url": "https://meetandplay.nl/club/88192?date=26-11-2026&sport=padel&dayPart=evening",
+      "slots": []
+    }
+  ]
+}

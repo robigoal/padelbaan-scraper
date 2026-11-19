@@ -2,3 +2,4 @@
 *.log
 *.plist
 __pycache__/
+.claude/

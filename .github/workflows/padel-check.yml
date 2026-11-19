@@ -3,11 +3,11 @@ name: Padelbaan-check De Geeren
 on:
   schedule:
     # elke 10 minuten (niet op :00, dan is GitHub het drukst en vertraagt het meest)
-    - cron: "3-59/10 * * * *"
+    - cron: "3,13,23,33,43,53 * * * *"
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # om state.json terug te committen
+  contents: write   # om state.json en docs/slots.json terug te committen
 
 concurrency:
   group: padel-check
@@ -32,10 +32,10 @@ jobs:
 
       - name: State opslaan
         run: |
-          if ! git diff --quiet -- state.json; then
+          if ! git diff --quiet -- state.json docs/slots.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add state.json
+            git add state.json docs/slots.json
             git commit -m "state bijgewerkt"
             git push
           fi

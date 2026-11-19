@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Padel De Geeren</title>
+<meta name="description" content="Vrije indoor dubbelbanen bij De Geeren op woensdag- en donderdagavond">
+<meta name="theme-color" content="#103a5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Padel">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #f3f6f9; --card: #ffffff; --text: #0f1e2b; --muted: #5d6f80; --line: #e1e8ef;
+    --brand: #103a5e; --ball: #d6e84a; --ok: #1f8f4e; --ok-bg: #e6f5ec; --btn-text: #0f1e2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1620; --card: #132433; --text: #e8eef4; --muted: #92a5b6; --line: #1f3446;
+      --brand: #0b2236; --ok: #5fd08e; --ok-bg: #143323;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    background: var(--brand); color: #fff;
+    padding: calc(env(safe-area-inset-top) + 20px) 16px 20px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+  h1 .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--ball); flex: none; }
+  header p { margin: 4px 0 0; opacity: .8; font-size: 15px; }
+  .status {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 16px; font-size: 14px; opacity: .9;
+  }
+  .refresh {
+    background: rgba(255,255,255,.14); color: #fff; border: 0; border-radius: 999px;
+    padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  .refresh:disabled { opacity: .6; }
+  main { padding: 16px 16px calc(env(safe-area-inset-bottom) + 24px); }
+  .day {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .day h2 { margin: 0; font-size: 18px; }
+  .badge { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .badge.free { color: var(--ok); background: var(--ok-bg); padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+  .slot { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .slot-time { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  .slot-meta { color: var(--muted); font-size: 14px; margin: 2px 0 12px; }
+  .book {
+    display: block; text-align: center; text-decoration: none; font-weight: 700;
+    background: var(--ball); color: var(--btn-text); border-radius: 12px; padding: 14px;
+    font-size: 17px;
+  }
+  .book:active { transform: scale(.99); }
+  .none { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
+  .none a { color: inherit; }
+  .how {
+    color: var(--muted); font-size: 14px; border: 1px dashed var(--line); border-radius: 16px;
+    padding: 14px 16px; margin-top: 20px;
+  }
+  .how ol { margin: 6px 0 0; padding-left: 20px; }
+  .how b { color: var(--text); }
+  .msg { color: var(--muted); text-align: center; padding: 32px 0; }
+  .err { color: #c0392b; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1><span class="dot" aria-hidden="true"></span>Padel De Geeren</h1>
+    <p>Wo &amp; do · start 20:00–21:00 · indoor dubbel</p>
+    <div class="status">
+      <span id="checked">Laden…</span>
+      <button class="refresh" id="refresh" type="button">Vernieuwen</button>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <div id="days"><p class="msg">Beschikbaarheid ophalen…</p></div>
+    <div class="how">
+      <b>Zo boek je</b>
+      <ol>
+        <li>Tik op <b>Boek</b>: Meet &amp; Play opent op padel, die avond.</li>
+        <li>Kies de starttijd en tik bij de baan op <b>Toevoegen</b>.</li>
+        <li>Afrekenen → kies <b>iDEAL | Wero</b> → bevestig in je bank-app.</li>
+      </ol>
+    </div>
+  </div>
+</main>
+<script>
+const REPO = "robigoal/padelbaan-scraper";
+const DATA_URLS = [
+  `https://raw.githubusercontent.com/${REPO}/main/docs/slots.json`,
+  "slots.json",
+];
+const RUNS_URL = `https://api.github.com/repos/${REPO}/actions/workflows/padel-check.yml/runs?per_page=1&status=completed`;
+const MONTHS = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function dayLabel(day) {
+  const [y, m, d] = day.iso.split("-").map(Number);
+  const wd = day.weekday.charAt(0).toUpperCase() + day.weekday.slice(1);
+  return `${wd} ${d} ${MONTHS[m-1]}`;
+}
+
+function ago(date) {
+  const min = Math.round((Date.now() - date.getTime()) / 60000);
+  if (min < 1) return "zojuist";
+  if (min < 60) return `${min} min geleden`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `${h} uur geleden` : date.toLocaleDateString("nl-NL");
+}
+
+async function fetchData() {
+  let lastErr;
+  for (const url of DATA_URLS) {
+    try {
+      const sep = url.includes("?") ? "&" : "?";
+      const r = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
+      if (r.ok) return await r.json();
+      lastErr = new Error(`HTTP ${r.status}`);
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+
+async function fetchLastCheck() {
+  try {
+    const r = await fetch(RUNS_URL, { cache: "no-store" });
+    if (!r.ok) return null;
+    const run = (await r.json()).workflow_runs?.[0];
+    return run ? new Date(run.updated_at) : null;
+  } catch { return null; }
+}
+
+function render(data) {
+  const today = todayIso();
+  const lateToday = new Date().getHours() * 60 + new Date().getMinutes() > 21 * 60; // na 21:00 is vandaag voorbij
+  const days = data.days.filter((d) => d.iso > today || (d.iso === today && !lateToday));
+  if (!days.length) {
+    $("days").innerHTML = `<p class="msg">Geen woensdag of donderdag binnen het boekingsvenster.</p>`;
+    return;
+  }
+  $("days").innerHTML = days.map((day) => {
+    const n = day.slots.length;
+    const badge = n ? `<span class="badge free">${n} vrij</span>` : `<span class="badge">vol</span>`;
+    const body = n
+      ? day.slots.map((s) => `
+          <div class="slot">
+            <div class="slot-time">${esc(s.time.replace(" - ", "–"))}</div>
+            <div class="slot-meta">${esc(s.court)} · ${esc(s.duration)} · <span style="white-space:nowrap">${esc(s.price)}</span></div>
+            <a class="book" href="${esc(day.booking_url)}" target="_blank" rel="noopener">Boek ${esc(s.start)} →</a>
+          </div>`).join("")
+      : `<p class="none">Geen dubbelbaan vrij om 20:00, 20:30 of 21:00. <a href="${esc(day.booking_url)}" target="_blank" rel="noopener">Zelf kijken</a></p>`;
+    return `<section class="day"><div class="day-head"><h2>${esc(dayLabel(day))}</h2>${badge}</div>${body}</section>`;
+  }).join("");
+}
+
+async function load() {
+  const btn = $("refresh");
+  btn.disabled = true; btn.textContent = "Bezig…";
+  try {
+    const [data, last] = await Promise.all([fetchData(), fetchLastCheck()]);
+    render(data);
+    $("checked").textContent = last ? `Laatste check: ${ago(last)}` : "Laatste check: onbekend";
+  } catch (e) {
+    $("days").innerHTML = `<p class="msg err">Kon de gegevens niet ophalen. Controleer je verbinding.</p>`;
+    $("checked").textContent = "Offline";
+  } finally {
+    btn.disabled = false; btn.textContent = "Vernieuwen";
+  }
+}
+
+$("refresh").addEventListener("click", load);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+load();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>

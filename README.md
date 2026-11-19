@@ -14,6 +14,13 @@ De Slack Incoming Webhook staat als repository secret `SLACK_WEBHOOK_URL`.
   of `gh workflow run padel-check.yml`.
 - Pauzeren: `gh workflow disable padel-check.yml` (weer aan: `enable`).
 
+## App op je telefoon (PWA)
+https://robigoal.github.io/padelbaan-scraper/ — toont de vrije banen uit `docs/slots.json`
+met per baan een **Boek**-knop die Meet & Play opent op padel, juiste datum, avond.
+Daar kies je de tijd → Toevoegen → Afrekenen met iDEAL | Wero.
+Installeren: open de link in Safari → Deel → *Zet op beginscherm* (Android/Chrome: *App installeren*).
+De app staat in `docs/` en wordt via GitHub Pages gehost.
+
 ## Lokaal
 Zet `SLACK_WEBHOOK_URL=...` in `.env` (staat in `.gitignore`).
 - `python3 padel_check.py --dry-run` — toont wat er vrij is, stuurt niets.

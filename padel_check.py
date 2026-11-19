@@ -38,6 +38,8 @@ FAILURES_BEFORE_ALERT = 3                        # na zoveel mislukte runs op ri
 
 HERE = Path(__file__).resolve().parent
 STATE_FILE = HERE / "state.json"
+SLOTS_FILE = HERE / "docs" / "slots.json"       # gelezen door de PWA
+PWA_URL = "https://robigoal.github.io/padelbaan-scraper/"
 ENV_FILE = HERE / ".env"
 UA = {"User-Agent": "Mozilla/5.0 (Macintosh) padel-check/1.0"}
 NL_MONTHS = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"]
@@ -123,15 +125,22 @@ def is_double_court(slot: dict) -> bool:
     return "dubbel" in t and "enkel" not in t and "single" not in c and "enkel" not in c
 
 
-def find_available() -> list[dict]:
+def booking_url(date_str: str) -> str:
+    """Deeplink: opent Meet & Play op Padel, juiste datum, dagdeel avond."""
+    return f"{CLUB_URL}?date={date_str}&sport=padel&dayPart=evening"
+
+
+def find_available() -> tuple[list[dict], list[dict]]:
     mp = MeetAndPlay()
     now = dt.datetime.now()
-    found = []
+    found, days = [], []
     for offset in range(DAYS_AHEAD + 1):
         day = now.date() + dt.timedelta(days=offset)
         if day.weekday() not in WEEKDAYS:
             continue
         date_str = day.strftime("%d-%m-%Y")
+        days.append({"date": date_str, "iso": day.isoformat(), "weekday": WEEKDAYS[day.weekday()],
+                     "booking_url": booking_url(date_str)})
         frag = mp.update({"tenantSportId": SPORT_PADEL, "roofType": ROOF,
                           "dayPart": "evening", "date": date_str})
         if mp.state.get("date") != date_str:
@@ -148,7 +157,7 @@ def find_available() -> list[dict]:
                 if s["time"].startswith(t) and is_double_court(s):
                     s.update(date=date_str, weekday=WEEKDAYS[day.weekday()], start=t)
                     found.append(s)
-    return found
+    return found, days
 
 
 # ---- State & Slack --------------------------------------------------------
@@ -183,13 +192,30 @@ def nice_date(date_str: str) -> str:
     return f"{d.day} {NL_MONTHS[d.month - 1]}"
 
 
+def sort_key(s: dict):
+    return (dt.datetime.strptime(s["date"], "%d-%m-%Y"), s["start"], s["court"])
+
+
 def format_message(slots: list[dict]) -> str:
     lines = [":tennis: *Padelbaan vrij bij De Geeren!*"]
-    for s in sorted(slots, key=lambda s: (dt.datetime.strptime(s["date"], "%d-%m-%Y"), s["start"], s["court"])):
+    for s in sorted(slots, key=sort_key):
         lines.append(f'• *{s["weekday"].capitalize()} {nice_date(s["date"])}* {s["time"]} '
-                     f'({s["duration"]}) – {s["court"]} – {s["price"]}')
-    lines.append(f"<{CLUB_URL}|Direct boeken op Meet & Play> (kies Padel, Binnen, juiste datum)")
+                     f'({s["duration"]}) – {s["court"]} – {s["price"]} – <{booking_url(s["date"])}|boek>')
+    lines.append(f"<{PWA_URL}|Open de padel-app>")
     return "\n".join(lines)
+
+
+def write_slots_file(slots: list[dict], days: list[dict]) -> None:
+    """Schrijf docs/slots.json voor de PWA (alleen als de inhoud verandert)."""
+    out = {"club_url": CLUB_URL, "start_times": START_TIMES, "days": []}
+    for d in days:
+        day_slots = [{k: s[k] for k in ("start", "time", "duration", "court", "price")}
+                     for s in sorted(slots, key=sort_key) if s["date"] == d["date"]]
+        out["days"].append({**d, "slots": day_slots})
+    text = json.dumps(out, indent=2, ensure_ascii=False) + "\n"
+    if not SLOTS_FILE.exists() or SLOTS_FILE.read_text() != text:
+        SLOTS_FILE.parent.mkdir(exist_ok=True)
+        SLOTS_FILE.write_text(text)
 
 
 def main() -> int:
@@ -206,7 +232,7 @@ def main() -> int:
 
     state = load_state()
     try:
-        slots = find_available()
+        slots, days = find_available()
     except Exception as e:  # netwerk- of site-wijziging
         log(f"FOUT: {e!r}")
         if args.dry_run:
@@ -232,6 +258,7 @@ def main() -> int:
             print("\n--- Slack-bericht (niet verstuurd) ---\n" + format_message(new))
         return 0
 
+    write_slots_file(slots, days)
     if new:
         send_slack(format_message(new))
         log("Slack-melding verstuurd")
