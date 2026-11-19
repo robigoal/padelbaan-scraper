@@ -1,6 +1,7 @@
-# Padelbaan-checker De Geeren (Baarn)
+# Padelbaan-checker rond Soest
 
-Checkt elke 10 minuten via KNLTB Meet & Play (club 88192) of er een **indoor dubbelbaan**
+Checkt elke 10 minuten bij **De Geeren Baarn** (KNLTB Meet & Play) en **Peakz Amersfoort**
+(Foys) of er een **indoor dubbelbaan**
 (geen single court) vrij is op **woensdag of donderdag** met begintijd **20:00, 20:30 of 21:00**,
 binnen het boekingsvenster van 10 dagen. Nieuwe vrije banen worden in Slack gemeld; dezelfde
 baan wordt pas opnieuw gemeld als hij tussendoor bezet is geweest.
@@ -16,8 +17,9 @@ De Slack Incoming Webhook staat als repository secret `SLACK_WEBHOOK_URL`.
 
 ## App op je telefoon (PWA)
 https://robigoal.github.io/padelbaan-scraper/ — toont de vrije banen uit `docs/slots.json`
-met per baan een **Boek**-knop die Meet & Play opent op padel, juiste datum, avond.
-Daar kies je de tijd → Toevoegen → Afrekenen met iDEAL | Wero.
+met per baan een **Boek**-knop naar de boekpagina van die club op de juiste datum.
+Plaza Padel Amersfoort en Laren (Playtomic) staan er alleen als snelkoppeling in:
+Playtomic blokkeert geautomatiseerde toegang, dus die worden niet gecheckt.
 Installeren: open de link in Safari → Deel → *Zet op beginscherm* (Android/Chrome: *App installeren*).
 De app staat in `docs/` en wordt via GitHub Pages gehost.
 

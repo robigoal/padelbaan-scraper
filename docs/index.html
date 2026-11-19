@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Padel De Geeren</title>
-<meta name="description" content="Vrije indoor dubbelbanen bij De Geeren op woensdag- en donderdagavond">
+<title>Padel rond Soest</title>
+<meta name="description" content="Vrije indoor dubbelbanen rond Soest op woensdag- en donderdagavond">
 <meta name="theme-color" content="#103a5e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -67,6 +67,10 @@
   }
   .book:active { transform: scale(.99); }
   .none { color: var(--muted); margin: 8px 0 0; font-size: 15px; }
+  .slot-club { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .links { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  .links a { color: inherit; margin-right: 10px; white-space: nowrap; }
+  .notice { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
   .none a { color: inherit; }
   .how {
     color: var(--muted); font-size: 14px; border: 1px dashed var(--line); border-radius: 16px;
@@ -81,7 +85,7 @@
 <body>
 <header>
   <div class="wrap">
-    <h1><span class="dot" aria-hidden="true"></span>Padel De Geeren</h1>
+    <h1><span class="dot" aria-hidden="true"></span>Padel rond Soest</h1>
     <p>Wo &amp; do · start 20:00–21:00 · indoor dubbel</p>
     <div class="status">
       <span id="checked">Laden…</span>
@@ -95,9 +99,9 @@
     <div class="how">
       <b>Zo boek je</b>
       <ol>
-        <li>Tik op <b>Boek</b>: Meet &amp; Play opent op padel, die avond.</li>
-        <li>Kies de starttijd en tik bij de baan op <b>Toevoegen</b>.</li>
-        <li>Afrekenen → kies <b>iDEAL | Wero</b> → bevestig in je bank-app.</li>
+        <li><b>De Geeren</b>: Meet &amp; Play opent op padel, die avond. Kies de tijd → <b>Toevoegen</b> → afrekenen met <b>iDEAL | Wero</b>.</li>
+        <li><b>Peakz</b>: de boekpagina opent op de juiste dag. Log in, kies tijd en baan en reken af.</li>
+        <li><b>Plaza Padel</b> (met *): wordt niet automatisch gecheckt. De link opent Playtomic; boeken en betalen gaat in de Playtomic-app.</li>
       </ol>
     </div>
   </div>
@@ -163,18 +167,26 @@ function render(data) {
     $("days").innerHTML = `<p class="msg">Geen woensdag of donderdag binnen het boekingsvenster.</p>`;
     return;
   }
-  $("days").innerHTML = days.map((day) => {
-    const n = day.slots.length;
+  const notice = (data.errors || []).length
+    ? `<div class="notice">Bij ${esc(data.errors.join(" en "))} lukte de laatste check niet; die banen ontbreken mogelijk.</div>`
+    : "";
+  $("days").innerHTML = notice + days.map((day) => {
+    const slots = day.slots || [];
+    const n = slots.length;
     const badge = n ? `<span class="badge free">${n} vrij</span>` : `<span class="badge">vol</span>`;
     const body = n
-      ? day.slots.map((s) => `
+      ? slots.map((s) => `
           <div class="slot">
+            <div class="slot-club">${esc(s.club)}</div>
             <div class="slot-time">${esc(s.time.replace(" - ", "–"))}</div>
-            <div class="slot-meta">${esc(s.court)} · ${esc(s.duration)} · <span style="white-space:nowrap">${esc(s.price)}</span></div>
-            <a class="book" href="${esc(day.booking_url)}" target="_blank" rel="noopener">Boek ${esc(s.start)} →</a>
+            <div class="slot-meta">${esc(s.court)} · ${esc(s.durations)} · <span style="white-space:nowrap">${esc(s.price)}</span></div>
+            <a class="book" href="${esc(s.booking_url)}" target="_blank" rel="noopener">Boek ${esc(s.start)} →</a>
           </div>`).join("")
-      : `<p class="none">Geen dubbelbaan vrij om 20:00, 20:30 of 21:00. <a href="${esc(day.booking_url)}" target="_blank" rel="noopener">Zelf kijken</a></p>`;
-    return `<section class="day"><div class="day-head"><h2>${esc(dayLabel(day))}</h2>${badge}</div>${body}</section>`;
+      : `<p class="none">Geen dubbelbaan vrij om ${esc((data.start_times || []).join(", "))}.</p>`;
+    const links = (day.links || []).map((l) =>
+      `<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.club)}${l.auto ? "" : "*"}</a>`).join("");
+    return `<section class="day"><div class="day-head"><h2>${esc(dayLabel(day))}</h2>${badge}</div>${body}`
+      + (links ? `<div class="links">Zelf kijken: ${links}</div>` : "") + `</section>`;
   }).join("");
 }
 

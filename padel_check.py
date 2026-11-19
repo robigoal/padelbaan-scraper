@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 """
-Checkt bij Racketcentrum De Geeren (Baarn) via KNLTB Meet & Play of er een
-indoor padelbaan voor 4 personen (dubbelspel, geen single court) vrij is op
-woensdag- of donderdagavond met begintijd 20:00, 20:30 of 21:00.
-Nieuwe vrije banen worden gemeld via een Slack Incoming Webhook.
+Checkt bij padelclubs rond Soest of er een indoor dubbelbaan (geen single court)
+vrij is op woensdag- of donderdagavond met begintijd 20:00, 20:30 of 21:00.
+Nieuwe vrije banen worden gemeld via een Slack Incoming Webhook, en
+docs/slots.json wordt bijgewerkt voor de PWA.
+
+Automatisch gecheckt:
+  - Racketcentrum De Geeren, Baarn   (KNLTB Meet & Play)
+  - Peakz Padel Amersfoort           (Foys, openbare API)
+Alleen als snelkoppeling in de app (Playtomic blokkeert geautomatiseerde toegang):
+  - Plaza Padel Amersfoort, Plaza Padel Laren
 
 Gebruik:
   python3 padel_check.py              # check en meld nieuwe vrije banen in Slack
-  python3 padel_check.py --dry-run    # check en print alleen, geen Slack, state ongewijzigd
+  python3 padel_check.py --dry-run    # check en print alleen, geen Slack, niets opslaan
   python3 padel_check.py --test-slack # stuur een testbericht naar Slack
 
-Configuratie staat in .env naast dit script (SLACK_WEBHOOK_URL=...).
+Configuratie: SLACK_WEBHOOK_URL in .env naast dit script (of als omgevingsvariabele).
 Alleen standaardbibliotheek, geen pip install nodig.
 """
 from __future__ import annotations
@@ -23,18 +29,36 @@ import json
 import os
 import re
 import sys
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 # ---- Instellingen ---------------------------------------------------------
-CLUB_URL = "https://meetandplay.nl/club/88192"   # Racketcentrum De Geeren
-UPDATE_URL = "https://meetandplay.nl/livewire/update"
 WEEKDAYS = {2: "woensdag", 3: "donderdag"}       # Python: ma=0 ... zo=6
 START_TIMES = ["20:00", "20:30", "21:00"]
-DAYS_AHEAD = 10                                  # club: reserveren kan 10 dagen vooruit
-SPORT_PADEL = 2
-ROOF = "INDOOR"
 FAILURES_BEFORE_ALERT = 3                        # na zoveel mislukte runs op rij: melding
+
+CLUBS = [
+    {   # reserveren kan 10 dagen vooruit
+        "key": "degeeren", "name": "De Geeren Baarn", "provider": "meetandplay",
+        "days_ahead": 10, "club_url": "https://meetandplay.nl/club/88192",
+    },
+    {   # Peakz Padel CUPRA Padel Dome, Middelhoefseweg 10
+        "key": "peakz-amersfoort", "name": "Peakz Amersfoort", "provider": "foys",
+        "days_ahead": 14,
+        "organisation_id": "df82f4dd-fd87-4af5-9c2f-656fe1a44357",
+        "location_id": "527bd7b9-d8d3-4c43-a2cb-997e5baa0527",
+        "location_slug": "cupra-padel-dome",
+        "reservation_type_id": 6,   # "Baanreservering"
+    },
+]
+# Niet automatisch te checken; wel een snelkoppeling in de app.
+LINK_ONLY_CLUBS = [
+    {"key": "plaza-amersfoort", "name": "Plaza Padel Amersfoort",
+     "url": "https://playtomic.com/clubs/plaza-padel-amersfoort"},
+    {"key": "plaza-laren", "name": "Plaza Padel Laren",
+     "url": "https://playtomic.com/clubs/plaza-padel-laren"},
+]
 
 HERE = Path(__file__).resolve().parent
 STATE_FILE = HERE / "state.json"
@@ -58,14 +82,38 @@ def load_env() -> None:
                 os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
+def candidate_days(days_ahead: int) -> list[dt.date]:
+    today = dt.date.today()
+    return [d for d in (today + dt.timedelta(days=i) for i in range(days_ahead + 1))
+            if d.weekday() in WEEKDAYS]
+
+
+def euro(amount: float) -> str:
+    return f"€ {amount:.2f}".replace(".", ",")
+
+
+def booking_url(club: dict, day: dt.date) -> str:
+    if club["provider"] == "meetandplay":
+        # opent Meet & Play op Padel, juiste datum, dagdeel avond
+        return f'{club["club_url"]}?date={day:%d-%m-%Y}&sport=padel&dayPart=evening'
+    if club["provider"] == "foys":
+        return ("https://www.peakzpadel.nl/reserveren/court-booking/reservation?"
+                + urllib.parse.urlencode({"daypart": "---", "date": day.isoformat(),
+                                          "location": club["location_slug"]}))
+    raise ValueError(club["provider"])
+
+
 # ---- Meet & Play (Livewire) ----------------------------------------------
 class MeetAndPlay:
     """Praat met de Livewire-component 'club.v2.court-show' op de clubpagina."""
+    UPDATE_URL = "https://meetandplay.nl/livewire/update"
 
-    def __init__(self) -> None:
+    def __init__(self, club_url: str) -> None:
+        self.club_url = club_url
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
-        page = self._get(CLUB_URL)
+        with self.opener.open(urllib.request.Request(club_url, headers=UA), timeout=30) as r:
+            page = r.read().decode("utf-8")
         m = re.search(r'data-csrf="([^"]+)"', page)
         if not m:
             raise RuntimeError("CSRF-token niet gevonden op clubpagina")
@@ -76,18 +124,13 @@ class MeetAndPlay:
             raise RuntimeError("Livewire-component 'club.v2.court-show' niet gevonden")
         self.snapshot = snaps[0]
 
-    def _get(self, url: str) -> str:
-        req = urllib.request.Request(url, headers=UA)
-        with self.opener.open(req, timeout=30) as r:
-            return r.read().decode("utf-8")
-
     def update(self, updates: dict) -> str:
         body = {"_token": self.csrf,
                 "components": [{"snapshot": self.snapshot, "updates": updates, "calls": []}]}
         req = urllib.request.Request(
-            UPDATE_URL, data=json.dumps(body).encode(),
+            self.UPDATE_URL, data=json.dumps(body).encode(),
             headers={**UA, "Content-Type": "application/json", "X-Livewire": "true",
-                     "X-CSRF-TOKEN": self.csrf, "Referer": CLUB_URL})
+                     "X-CSRF-TOKEN": self.csrf, "Referer": self.club_url})
         with self.opener.open(req, timeout=30) as r:
             comp = json.loads(r.read())["components"][0]
         self.snapshot = comp["snapshot"]
@@ -98,7 +141,7 @@ class MeetAndPlay:
         return json.loads(self.snapshot)["data"]
 
 
-def parse_slots(fragment: str) -> list[dict]:
+def parse_meetandplay_slots(fragment: str) -> list[dict]:
     """Haal de getoonde tijdsloten uit de HTML, met baantype (bv. 'Binnen • Dubbelspel')."""
     slots = []
     for block in re.split(r'(?=<div class="mp-court-type")', fragment)[1:]:
@@ -110,9 +153,8 @@ def parse_slots(fragment: str) -> list[dict]:
                 block, re.S):
             price = re.sub(r"<[^>]+>|\s+", " ", m.group(5)).strip()
             slots.append({
-                "id": m.group(1),
                 "time": m.group(2).strip(),
-                "duration": m.group(3).strip(),
+                "duration": int(re.sub(r"\D", "", m.group(3)) or 0),
                 "court": html.unescape(m.group(4)).strip(),
                 "type": court_type,
                 "price": html.unescape(price),
@@ -120,60 +162,123 @@ def parse_slots(fragment: str) -> list[dict]:
     return slots
 
 
-def is_double_court(slot: dict) -> bool:
+def is_double_meetandplay(slot: dict) -> bool:
     t, c = slot["type"].lower(), slot["court"].lower()
     return "dubbel" in t and "enkel" not in t and "single" not in c and "enkel" not in c
 
 
-def booking_url(date_str: str) -> str:
-    """Deeplink: opent Meet & Play op Padel, juiste datum, dagdeel avond."""
-    return f"{CLUB_URL}?date={date_str}&sport=padel&dayPart=evening"
-
-
-def find_available() -> tuple[list[dict], list[dict]]:
-    mp = MeetAndPlay()
-    now = dt.datetime.now()
-    found, days = [], []
-    for offset in range(DAYS_AHEAD + 1):
-        day = now.date() + dt.timedelta(days=offset)
-        if day.weekday() not in WEEKDAYS:
-            continue
+def check_meetandplay(club: dict) -> list[dict]:
+    mp = MeetAndPlay(club["club_url"])
+    found = []
+    for day in candidate_days(club["days_ahead"]):
         date_str = day.strftime("%d-%m-%Y")
-        days.append({"date": date_str, "iso": day.isoformat(), "weekday": WEEKDAYS[day.weekday()],
-                     "booking_url": booking_url(date_str)})
-        frag = mp.update({"tenantSportId": SPORT_PADEL, "roofType": ROOF,
+        frag = mp.update({"tenantSportId": 2, "roofType": "INDOOR",   # 2 = padel
                           "dayPart": "evening", "date": date_str})
         if mp.state.get("date") != date_str:
-            log(f"{date_str}: datum niet geaccepteerd (buiten boekingsvenster?)")
+            log(f"  {date_str}: datum niet geaccepteerd (buiten boekingsvenster?)")
             continue
         offered = re.findall(r'wire:key="start-time-([\d:]+)"', frag)
         wanted = [t for t in START_TIMES if t in offered]
-        log(f"{date_str} ({WEEKDAYS[day.weekday()]}): starttijden {offered or '-'}; relevant {wanted or '-'}")
+        log(f"  {date_str}: starttijden {offered or '-'}; relevant {wanted or '-'}")
         for t in wanted:
             frag = mp.update({"time": t})
             if mp.state.get("time") != t:   # site valt terug op eerste tijd als t niet kan
                 continue
-            for s in parse_slots(frag):
-                if s["time"].startswith(t) and is_double_court(s):
-                    s.update(date=date_str, weekday=WEEKDAYS[day.weekday()], start=t)
-                    found.append(s)
-    return found, days
+            for s in parse_meetandplay_slots(frag):
+                if s["time"].startswith(t) and is_double_meetandplay(s):
+                    found.append({"day": day, "start": t, "time": s["time"], "court": s["court"],
+                                  "duration": s["duration"], "price": s["price"]})
+    return found
 
 
-# ---- State & Slack --------------------------------------------------------
+# ---- Foys (Peakz) ---------------------------------------------------------
+def check_foys(club: dict) -> list[dict]:
+    base = "https://api.foys.io/court-booking/public/api/v1/locations/search"
+    headers = {**UA, "Accept": "application/json",
+               "X-FederationID": club["organisation_id"],
+               "X-OrganisationId": club["organisation_id"]}
+    found = []
+    for day in candidate_days(club["days_ahead"]):
+        qs = urllib.parse.urlencode([
+            ("reservationTypeId", club["reservation_type_id"]),
+            ("locationId", club["location_id"]),
+            ("playingTimes[]", 60), ("playingTimes[]", 90), ("playingTimes[]", 120),
+            ("date", f"{day.isoformat()}T00:00:00.000Z"),
+        ])
+        with urllib.request.urlopen(urllib.request.Request(f"{base}?{qs}", headers=headers),
+                                    timeout=30) as r:
+            locations = json.loads(r.read())
+        n_courts = n_free = 0
+        for loc in locations:
+            for court in loc.get("inventoryItemsTimeSlots", []):
+                ctype = (court.get("type") or court.get("inventoryItemType", {}).get("name") or "").lower()
+                if "double" not in ctype or "indoor" not in ctype:
+                    continue
+                n_courts += 1
+                for ts in court.get("timeSlots", []):
+                    start = ts["startTime"][11:16]
+                    if ts["startTime"][:10] != day.isoformat() or start not in START_TIMES \
+                            or not ts.get("isAvailable"):
+                        continue
+                    n_free += 1
+                    found.append({"day": day, "start": start,
+                                  "time": f'{start} - {ts["endTime"][11:16]}',
+                                  "court": court["name"], "duration": ts["duration"],
+                                  "price": euro(ts["price"])})
+        log(f"  {day:%d-%m-%Y}: {n_courts} dubbelbanen, {n_free} vrije slot(s) op relevante tijden")
+    return found
+
+
+PROVIDERS = {"meetandplay": check_meetandplay, "foys": check_foys}
+
+
+def merge_durations(raw: list[dict], club: dict) -> list[dict]:
+    """Zelfde baan + starttijd met verschillende duur samenvoegen tot één slot."""
+    grouped: dict[tuple, list[dict]] = {}
+    for s in raw:
+        grouped.setdefault((s["day"], s["start"], s["court"]), []).append(s)
+    out = []
+    for (day, start, court), items in grouped.items():
+        items.sort(key=lambda s: s["duration"])
+        first = items[0]
+        out.append({
+            "club": club["name"], "club_key": club["key"],
+            "date": day.strftime("%d-%m-%Y"), "iso": day.isoformat(),
+            "weekday": WEEKDAYS[day.weekday()], "start": start,
+            "time": first["time"], "court": court,
+            "durations": "/".join(str(s["duration"]) for s in items) + " min",
+            "price": first["price"] + (f' ({first["duration"]} min)' if len(items) > 1 else ""),
+            "booking_url": booking_url(club, day),
+        })
+    return out
+
+
+# ---- State, Slack en slots.json ------------------------------------------
 def slot_key(s: dict) -> str:
-    return f'{s["date"]} {s["start"]} {s["court"]} {s["duration"]}'
+    return f'{s["club_key"]} {s["date"]} {s["start"]} {s["court"]}'
+
+
+def sort_key(s: dict):
+    return (s["iso"], s["start"], s["club"], s["court"])
 
 
 def load_state() -> dict:
     try:
-        return json.loads(STATE_FILE.read_text())
+        state = json.loads(STATE_FILE.read_text())
     except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        state = {}
+    if not isinstance(state.get("failures"), dict):   # oud formaat (één teller)
+        state["failures"] = {}
+    # Oud formaat (alleen De Geeren): "25-11-2026 21:00 Baan 60 minuten" -> "degeeren 25-11-2026 21:00 Baan"
+    keys = {c["key"] for c in CLUBS}
+    state["available"] = [
+        k if k.split(" ", 1)[0] in keys else "degeeren " + re.sub(r" \d+ minuten$", "", k)
+        for k in state.get("available", [])]
+    return state
 
 
 def save_state(state: dict) -> None:
-    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False))
+    STATE_FILE.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n")
 
 
 def send_slack(text: str) -> None:
@@ -187,31 +292,41 @@ def send_slack(text: str) -> None:
             raise RuntimeError(f"Slack gaf status {r.status}")
 
 
-def nice_date(date_str: str) -> str:
-    d = dt.datetime.strptime(date_str, "%d-%m-%Y")
+def nice_date(iso: str) -> str:
+    d = dt.date.fromisoformat(iso)
     return f"{d.day} {NL_MONTHS[d.month - 1]}"
 
 
-def sort_key(s: dict):
-    return (dt.datetime.strptime(s["date"], "%d-%m-%Y"), s["start"], s["court"])
-
-
 def format_message(slots: list[dict]) -> str:
-    lines = [":tennis: *Padelbaan vrij bij De Geeren!*"]
-    for s in sorted(slots, key=sort_key):
-        lines.append(f'• *{s["weekday"].capitalize()} {nice_date(s["date"])}* {s["time"]} '
-                     f'({s["duration"]}) – {s["court"]} – {s["price"]} – <{booking_url(s["date"])}|boek>')
+    lines = [":tennis: *Padelbaan vrij!*"]
+    for club in [c["name"] for c in CLUBS]:
+        club_slots = sorted((s for s in slots if s["club"] == club), key=sort_key)
+        if not club_slots:
+            continue
+        lines.append(f"*{club}*")
+        for s in club_slots:
+            lines.append(f'• {s["weekday"].capitalize()} {nice_date(s["iso"])} {s["time"]} '
+                         f'({s["durations"]}) – {s["court"]} – {s["price"]} – <{s["booking_url"]}|boek>')
     lines.append(f"<{PWA_URL}|Open de padel-app>")
     return "\n".join(lines)
 
 
-def write_slots_file(slots: list[dict], days: list[dict]) -> None:
+def write_slots_file(slots: list[dict], failed: list[str]) -> None:
     """Schrijf docs/slots.json voor de PWA (alleen als de inhoud verandert)."""
-    out = {"club_url": CLUB_URL, "start_times": START_TIMES, "days": []}
-    for d in days:
-        day_slots = [{k: s[k] for k in ("start", "time", "duration", "court", "price")}
-                     for s in sorted(slots, key=sort_key) if s["date"] == d["date"]]
-        out["days"].append({**d, "slots": day_slots})
+    max_ahead = max(c["days_ahead"] for c in CLUBS)
+    out = {"start_times": START_TIMES, "errors": failed, "days": []}
+    for day in candidate_days(max_ahead):
+        links = [{"club": c["name"], "url": booking_url(c, day), "auto": True}
+                 for c in CLUBS if day in candidate_days(c["days_ahead"])]
+        links += [{"club": c["name"], "url": c["url"], "auto": False} for c in LINK_ONLY_CLUBS]
+        out["days"].append({
+            "date": day.strftime("%d-%m-%Y"), "iso": day.isoformat(),
+            "weekday": WEEKDAYS[day.weekday()],
+            "slots": [{k: s[k] for k in ("club", "start", "time", "durations", "court", "price",
+                                         "booking_url")}
+                      for s in sorted(slots, key=sort_key) if s["iso"] == day.isoformat()],
+            "links": links,
+        })
     text = json.dumps(out, indent=2, ensure_ascii=False) + "\n"
     if not SLOTS_FILE.exists() or SLOTS_FILE.read_text() != text:
         SLOTS_FILE.parent.mkdir(exist_ok=True)
@@ -220,54 +335,67 @@ def write_slots_file(slots: list[dict], days: list[dict]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--dry-run", action="store_true", help="niet naar Slack sturen, state niet aanpassen")
+    ap.add_argument("--dry-run", action="store_true", help="niet naar Slack sturen, niets opslaan")
     ap.add_argument("--test-slack", action="store_true", help="stuur een testbericht naar Slack")
     args = ap.parse_args()
     load_env()
 
     if args.test_slack:
-        send_slack(":white_check_mark: Testbericht van de padelbaan-checker voor De Geeren.")
+        send_slack(":white_check_mark: Testbericht van de padelbaan-checker.")
         log("Testbericht verstuurd")
         return 0
 
     state = load_state()
-    try:
-        slots, days = find_available()
-    except Exception as e:  # netwerk- of site-wijziging
-        log(f"FOUT: {e!r}")
-        if args.dry_run:
-            return 1
-        state["failures"] = state.get("failures", 0) + 1
-        if state["failures"] == FAILURES_BEFORE_ALERT:
-            try:
-                send_slack(f":warning: Padelbaan-checker faalt al {FAILURES_BEFORE_ALERT}x op rij: `{e!r}`")
-            except Exception as e2:
-                log(f"Slack-waarschuwing mislukt: {e2!r}")
-        save_state(state)
-        return 1
+    seen = set(state.get("available", []))
+    slots: list[dict] = []
+    failed: list[str] = []
+    keep: set[str] = set()     # bekende vrije banen van clubs die nu faalden
+    alerts: list[str] = []
+    for club in CLUBS:
+        log(f"{club['name']}:")
+        try:
+            club_slots = merge_durations(PROVIDERS[club["provider"]](club), club)
+        except Exception as e:  # netwerk- of site-wijziging; andere clubs gaan gewoon door
+            log(f"  FOUT: {e!r}")
+            failed.append(club["name"])
+            n = state["failures"].get(club["key"], 0) + 1
+            state["failures"][club["key"]] = n
+            if n == FAILURES_BEFORE_ALERT:
+                alerts.append(f":warning: Check bij {club['name']} faalt al {n}x op rij: `{e!r}`")
+            keep |= {k for k in seen if k.startswith(club["key"] + " ")}
+            continue
+        state["failures"].pop(club["key"], None)
+        slots.extend(club_slots)
 
     current = {slot_key(s): s for s in slots}
-    seen = set(state.get("available", []))
-    new = [s for k, s in current.items() if k not in seen]
-    log(f"{len(current)} geschikte baan/banen vrij, waarvan {len(new)} nieuw")
-    for s in slots:
-        log(f"  {s['weekday']} {s['date']} {s['time']} {s['court']} ({s['type']}, {s['price']})")
+    new_keys = set(current) - seen
+    new = [current[k] for k in new_keys]
+    log(f"Totaal {len(current)} geschikte baan/banen vrij, waarvan {len(new)} nieuw")
+    for s in sorted(slots, key=sort_key):
+        log(f"  {s['club']}: {s['weekday']} {s['date']} {s['time']} {s['court']} "
+            f"({s['durations']}, {s['price']}){'  [NIEUW]' if slot_key(s) in new_keys else ''}")
 
     if args.dry_run:
         if new:
             print("\n--- Slack-bericht (niet verstuurd) ---\n" + format_message(new))
+        for a in alerts:
+            print(a)
         return 0
 
-    write_slots_file(slots, days)
+    write_slots_file(slots, failed)
     if new:
         send_slack(format_message(new))
         log("Slack-melding verstuurd")
+    for a in alerts:
+        try:
+            send_slack(a)
+        except Exception as e:
+            log(f"Slack-waarschuwing mislukt: {e!r}")
     # Onthoud wat nu vrij is; een baan die weer bezet raakt en later vrijkomt wordt opnieuw gemeld.
-    state["available"] = sorted(current)
-    state["failures"] = 0
-    state.pop("last_run", None)  # niet opslaan: zou elke run een commit opleveren
+    state["available"] = sorted(set(current) | keep)
+    state.pop("last_run", None)
     save_state(state)
-    return 0
+    return 1 if len(failed) == len(CLUBS) else 0
 
 
 if __name__ == "__main__":
