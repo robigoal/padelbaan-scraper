@@ -1,0 +1,62 @@
+name: Instellingen opslaan
+
+# Gestart vanuit de padel-app: slaat dagen en starttijden op in config.json
+# en draait daarna meteen een check met de nieuwe instellingen.
+on:
+  workflow_dispatch:
+    inputs:
+      weekdays:
+        description: "Dagen, komma-gescheiden (ma=0 ... zo=6), bv. 2,3"
+        required: true
+      start_times:
+        description: "Starttijden, komma-gescheiden (HH:MM, op :00 of :30), bv. 20:00,20:30"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: padel-check        # zelfde groep als de checker: nooit tegelijk committen
+  cancel-in-progress: false
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TZ: Europe/Amsterdam
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instellingen controleren en opslaan
+        env:
+          # via env, niet in het script geplakt: invoer wordt nooit als code uitgevoerd
+          IN_WEEKDAYS: ${{ inputs.weekdays }}
+          IN_START_TIMES: ${{ inputs.start_times }}
+        run: |
+          python3 - <<'EOF'
+          import json, os, padel_check as p
+          cfg = p.validate_config({
+              "weekdays": [d for d in os.environ["IN_WEEKDAYS"].split(",") if d.strip()],
+              "start_times": [t for t in os.environ["IN_START_TIMES"].split(",") if t.strip()],
+          })
+          open("config.json", "w").write(json.dumps(cfg, indent=2) + "\n")
+          print("Nieuwe instellingen:", cfg)
+          EOF
+
+      - name: Check met nieuwe instellingen
+        continue-on-error: true
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 padel_check.py
+
+      - name: Opslaan
+        run: |
+          if ! git diff --quiet -- config.json state.json docs/slots.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add config.json state.json docs/slots.json
+            git commit -m "instellingen bijgewerkt vanuit de app"
+            git push
+          fi

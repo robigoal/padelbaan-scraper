@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Checkt bij padelclubs rond Soest of er een indoor dubbelbaan (geen single court)
-vrij is op woensdag- of donderdagavond met begintijd 20:00, 20:30 of 21:00.
+vrij is op de ingestelde dagen en starttijden (config.json, in te stellen via de app;
+standaard woensdag/donderdag 20:00, 20:30 of 21:00).
 Nieuwe vrije banen worden gemeld via Slack (Incoming Webhook) en als pushmelding
 via ntfy (app op je telefoon, geheim topic in NTFY_TOPIC), en
 docs/slots.json wordt bijgewerkt voor de PWA.
@@ -9,6 +10,7 @@ docs/slots.json wordt bijgewerkt voor de PWA.
 Automatisch gecheckt:
   - Racketcentrum De Geeren, Baarn   (KNLTB Meet & Play)
   - Peakz Padel Amersfoort           (Foys, openbare API)
+  - Sportcentrum Kees, Bilthoven     (Bookaball)
 Alleen als snelkoppeling in de app (Playtomic blokkeert geautomatiseerde toegang):
   - Plaza Padel Amersfoort, Plaza Padel Laren
 
@@ -36,9 +38,34 @@ import urllib.request
 from pathlib import Path
 
 # ---- Instellingen ---------------------------------------------------------
-WEEKDAYS = {2: "woensdag", 3: "donderdag"}       # Python: ma=0 ... zo=6
-START_TIMES = ["20:00", "20:30", "21:00"]
+HERE = Path(__file__).resolve().parent
+CONFIG_FILE = HERE / "config.json"               # dagen + starttijden; aanpasbaar via de app
+WEEKDAY_NAMES = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
+DEFAULT_CONFIG = {"weekdays": [2, 3], "start_times": ["20:00", "20:30", "21:00"]}  # ma=0 ... zo=6
 FAILURES_BEFORE_ALERT = 3                        # na zoveel mislukte runs op rij: melding
+
+
+def validate_config(cfg: dict) -> dict:
+    """Controleer en normaliseer de instellingen; gooit ValueError bij iets ongeldigs."""
+    days = sorted({int(d) for d in cfg.get("weekdays", [])})
+    times = sorted({str(t).strip() for t in cfg.get("start_times", [])})
+    if not days or any(d < 0 or d > 6 for d in days):
+        raise ValueError(f"ongeldige dagen: {days}")
+    if not times or len(times) > 40 or any(not re.fullmatch(r"([01]\d|2[0-3]):[03]0", t) for t in times):
+        raise ValueError(f"ongeldige starttijden: {times}")
+    return {"weekdays": days, "start_times": times}
+
+
+def load_config() -> dict:
+    try:
+        return validate_config(json.loads(CONFIG_FILE.read_text()))
+    except FileNotFoundError:
+        return dict(DEFAULT_CONFIG)
+
+
+CONFIG = load_config()
+WEEKDAYS = {d: WEEKDAY_NAMES[d] for d in CONFIG["weekdays"]}
+START_TIMES = CONFIG["start_times"]
 
 CLUBS = [
     {   # reserveren kan 10 dagen vooruit
@@ -53,6 +80,10 @@ CLUBS = [
         "location_slug": "cupra-padel-dome",
         "reservation_type_id": 6,   # "Baanreservering"
     },
+    {   # Sportcentrum Kees, Kees Boekelaan 3; 3 weken vooruit boekbaar
+        "key": "kees-bilthoven", "name": "Kees Bilthoven", "short": "Kees", "provider": "bookaball",
+        "days_ahead": 21, "base_url": "https://sportcentrumkees.bookaball.com", "location_id": 195,
+    },
 ]
 # Niet automatisch te checken; wel een snelkoppeling in de app.
 LINK_ONLY_CLUBS = [
@@ -62,7 +93,6 @@ LINK_ONLY_CLUBS = [
      "url": "https://playtomic.com/clubs/plaza-padel-laren"},
 ]
 
-HERE = Path(__file__).resolve().parent
 STATE_FILE = HERE / "state.json"
 SLOTS_FILE = HERE / "docs" / "slots.json"       # gelezen door de PWA
 PWA_URL = "https://robigoal.github.io/padelbaan-scraper/"
@@ -94,10 +124,18 @@ def euro(amount: float) -> str:
     return f"€ {amount:.2f}".replace(".", ",")
 
 
+def meetandplay_daypart() -> str:
+    """Filter 'avond' alleen als alle gekozen tijden 's avonds vallen; anders alles."""
+    return "evening" if all(t >= "18:00" for t in START_TIMES) else ""
+
+
 def booking_url(club: dict, day: dt.date) -> str:
     if club["provider"] == "meetandplay":
-        # opent Meet & Play op Padel, juiste datum, dagdeel avond
-        return f'{club["club_url"]}?date={day:%d-%m-%Y}&sport=padel&dayPart=evening'
+        # opent Meet & Play op Padel, juiste datum (en dagdeel avond als dat past)
+        dp = meetandplay_daypart()
+        return f'{club["club_url"]}?date={day:%d-%m-%Y}&sport=padel' + (f"&dayPart={dp}" if dp else "")
+    if club["provider"] == "bookaball":
+        return f'{club["base_url"]}/nl/bookings/create'
     if club["provider"] == "foys":
         return ("https://www.peakzpadel.nl/reserveren/court-booking/reservation?"
                 + urllib.parse.urlencode({"daypart": "---", "date": day.isoformat(),
@@ -175,7 +213,7 @@ def check_meetandplay(club: dict) -> list[dict]:
     for day in candidate_days(club["days_ahead"]):
         date_str = day.strftime("%d-%m-%Y")
         frag = mp.update({"tenantSportId": 2, "roofType": "INDOOR",   # 2 = padel
-                          "dayPart": "evening", "date": date_str})
+                          "dayPart": meetandplay_daypart(), "date": date_str})
         if mp.state.get("date") != date_str:
             log(f"  {date_str}: datum niet geaccepteerd (buiten boekingsvenster?)")
             continue
@@ -231,7 +269,49 @@ def check_foys(club: dict) -> list[dict]:
     return found
 
 
-PROVIDERS = {"meetandplay": check_meetandplay, "foys": check_foys}
+# ---- Bookaball (Sportcentrum Kees) ----------------------------------------
+def check_bookaball(club: dict) -> list[dict]:
+    """Doorloopt de boekwizard als gast (club -> padel/dubbel/indoor) en vraagt per datum de
+    starttijden op. Er wordt niets gereserveerd; de wizard houdt alleen sessiestatus bij."""
+    base = club["base_url"]
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+
+    def call(method: str, path: str, body: dict | None = None):
+        xsrf = next((urllib.parse.unquote(c.value) for c in cj if c.name == "XSRF-TOKEN"), "")
+        headers = {**UA, "Accept": "application/json", "X-XSRF-TOKEN": xsrf,
+                   "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/nl/bookings/create"}
+        data = None
+        if body is not None:
+            data = json.dumps(body).encode()
+            headers["Content-Type"] = "application/json"
+        with opener.open(urllib.request.Request(base + path, data=data, headers=headers, method=method),
+                         timeout=30) as r:
+            return json.loads(r.read() or b"null")
+
+    opener.open(urllib.request.Request(f"{base}/nl/bookings/create", headers=UA), timeout=30).read()
+    call("GET", "/api/bookings/reset")
+    call("POST", "/api/bookings/create", {"step": "STEP_LOCATION", "location_id": club["location_id"]})
+    call("POST", "/api/bookings/create", {"step": "STEP_SIZE", "sport_type": "padel",
+                                          "court_size": "double", "court_count": 1, "court_type": "indoor"})
+    found = []
+    for day in candidate_days(club["days_ahead"]):
+        n_free = 0
+        for duration in (60, 90):
+            times = call("POST", "/api/bookings/times", {"date": day.isoformat(), "duration": duration}) or []
+            for t in times:
+                if t.get("time") in START_TIMES and t.get("available") and not t.get("disabled"):
+                    n_free += 1
+                    end = (dt.datetime.combine(day, dt.time.fromisoformat(t["time"]))
+                           + dt.timedelta(minutes=duration)).strftime("%H:%M")
+                    found.append({"day": day, "start": t["time"], "time": f'{t["time"]} - {end}',
+                                  "court": "Dubbelbaan indoor", "duration": duration,
+                                  "price": euro(t.get("price", 0) / 100)})
+        log(f"  {day:%d-%m-%Y}: {n_free} vrije slot(s) op relevante tijden")
+    return found
+
+
+PROVIDERS = {"meetandplay": check_meetandplay, "foys": check_foys, "bookaball": check_bookaball}
 
 
 def merge_durations(raw: list[dict], club: dict) -> list[dict]:
@@ -355,7 +435,7 @@ def format_message(slots: list[dict]) -> str:
 def write_slots_file(slots: list[dict], failed: list[str]) -> None:
     """Schrijf docs/slots.json voor de PWA (alleen als de inhoud verandert)."""
     max_ahead = max(c["days_ahead"] for c in CLUBS)
-    out = {"start_times": START_TIMES, "errors": failed, "days": []}
+    out = {"weekdays": sorted(WEEKDAYS), "start_times": START_TIMES, "errors": failed, "days": []}
     for day in candidate_days(max_ahead):
         links = [{"club": c["name"], "url": booking_url(c, day), "auto": True}
                  for c in CLUBS if day in candidate_days(c["days_ahead"])]

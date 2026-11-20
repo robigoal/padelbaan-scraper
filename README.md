@@ -1,9 +1,9 @@
 # Padelbaan-checker rond Soest
 
-Checkt elke 10 minuten bij **De Geeren Baarn** (KNLTB Meet & Play) en **Peakz Amersfoort**
-(Foys) of er een **indoor dubbelbaan**
-(geen single court) vrij is op **woensdag of donderdag** met begintijd **20:00, 20:30 of 21:00**,
-binnen het boekingsvenster van 10 dagen. Nieuwe vrije banen worden in Slack gemeld; dezelfde
+Checkt elke 10 minuten bij **De Geeren Baarn** (KNLTB Meet & Play), **Peakz Amersfoort**
+(Foys) en **Sportcentrum Kees Bilthoven** (Bookaball) of er een **indoor dubbelbaan**
+(geen single court) vrij is op de ingestelde dagen en starttijden (standaard **woensdag of
+donderdag**, begintijd **20:00, 20:30 of 21:00**), binnen het boekingsvenster van elke club. Nieuwe vrije banen worden in Slack gemeld; dezelfde
 baan wordt pas opnieuw gemeld als hij tussendoor bezet is geweest.
 
 ## Hoe het draait
@@ -14,6 +14,14 @@ De Slack Incoming Webhook staat als repository secret `SLACK_WEBHOOK_URL`.
 - Handmatig draaien: tab **Actions** → *Padelbaan-check De Geeren* → **Run workflow**,
   of `gh workflow run padel-check.yml`.
 - Pauzeren: `gh workflow disable padel-check.yml` (weer aan: `enable`).
+
+## Tijden instellen
+Dagen en starttijden staan in `config.json` en gelden voor alle clubs. In de app tik je op
+**Tijden**, kiest dagen en starttijden en tikt op **Opslaan**. De app start dan de workflow
+`settings.yml`, die de invoer controleert, `config.json` bijwerkt en meteen een check draait.
+
+Eenmalig nodig: een fine-grained GitHub-token (alleen repo padelbaan-scraper,
+**Actions: Read and write**), dat je in de app plakt. Het blijft alleen op je telefoon.
 
 ## Pushmeldingen (ntfy)
 Naast Slack stuurt het script bij nieuwe vrije banen een push via [ntfy](https://ntfy.sh).

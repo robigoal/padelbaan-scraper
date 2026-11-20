@@ -1,4 +1,8 @@
 {
+  "weekdays": [
+    2,
+    3
+  ],
   "start_times": [
     "20:00",
     "20:30",
@@ -33,6 +37,11 @@
           "auto": true
         },
         {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
+          "auto": true
+        },
+        {
           "club": "Plaza Padel Amersfoort",
           "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
           "auto": false
@@ -48,7 +57,17 @@
       "date": "26-11-2026",
       "iso": "2026-11-26",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "De Geeren Baarn",
@@ -58,6 +77,11 @@
         {
           "club": "Peakz Amersfoort",
           "url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-11-26&location=cupra-padel-dome",
+          "auto": true
+        },
+        {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
           "auto": true
         },
         {
@@ -112,6 +136,11 @@
           "auto": true
         },
         {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
+          "auto": true
+        },
+        {
           "club": "Plaza Padel Amersfoort",
           "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
           "auto": false
@@ -127,11 +156,82 @@
       "date": "03-12-2026",
       "iso": "2026-12-03",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "Peakz Amersfoort",
           "url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-12-03&location=cupra-padel-dome",
+          "auto": true
+        },
+        {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
+          "auto": true
+        },
+        {
+          "club": "Plaza Padel Amersfoort",
+          "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
+          "auto": false
+        },
+        {
+          "club": "Plaza Padel Laren",
+          "url": "https://playtomic.com/clubs/plaza-padel-laren",
+          "auto": false
+        }
+      ]
+    },
+    {
+      "date": "09-12-2026",
+      "iso": "2026-12-09",
+      "weekday": "woensdag",
+      "slots": [],
+      "links": [
+        {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
+          "auto": true
+        },
+        {
+          "club": "Plaza Padel Amersfoort",
+          "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
+          "auto": false
+        },
+        {
+          "club": "Plaza Padel Laren",
+          "url": "https://playtomic.com/clubs/plaza-padel-laren",
+          "auto": false
+        }
+      ]
+    },
+    {
+      "date": "10-12-2026",
+      "iso": "2026-12-10",
+      "weekday": "donderdag",
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
+      "links": [
+        {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
           "auto": true
         },
         {

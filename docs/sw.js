@@ -1,5 +1,5 @@
 // Service worker: app-schil offline beschikbaar; beschikbaarheid altijd live ophalen.
-const CACHE = "padel-v4";
+const CACHE = "padel-v5";
 const SHELL = ["./", "index.html", "manifest.webmanifest",
                "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 

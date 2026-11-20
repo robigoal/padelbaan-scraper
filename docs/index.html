@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Padel rond Soest</title>
-<meta name="description" content="Vrije indoor dubbelbanen rond Soest op woensdag- en donderdagavond">
+<meta name="description" content="Vrije indoor padel-dubbelbanen rond Soest op jouw tijden">
 <meta name="theme-color" content="#103a5e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -80,27 +80,69 @@
   .how b { color: var(--text); }
   .msg { color: var(--muted); text-align: center; padding: 32px 0; }
   .err { color: #c0392b; }
+  .buttons { display: flex; gap: 8px; }
+  .settings h2 { margin: 0 0 4px; font-size: 18px; }
+  .settings h3 { margin: 18px 0 8px; font-size: 15px; }
+  .small { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+  .small a { color: inherit; }
+  .chips { display: grid; gap: 6px; }
+  .chips.days { grid-template-columns: repeat(7, 1fr); }
+  .chips.times { grid-template-columns: repeat(5, 1fr); }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip span {
+    display: block; text-align: center; padding: 9px 0; border-radius: 10px; font-size: 14px;
+    border: 1px solid var(--line); color: var(--text); cursor: pointer; user-select: none;
+  }
+  .chip input:checked + span { background: var(--ball); border-color: var(--ball); color: var(--btn-text); font-weight: 700; }
+  .chip input:focus-visible + span { outline: 2px solid var(--ok); outline-offset: 2px; }
+  .field {
+    width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 16px;
+  }
+  .primary {
+    width: 100%; margin-top: 18px; border: 0; border-radius: 12px; padding: 14px; font: inherit;
+    font-weight: 700; font-size: 17px; background: var(--ball); color: var(--btn-text); cursor: pointer;
+  }
+  .primary:disabled { opacity: .6; }
+  .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 </style>
 </head>
 <body>
 <header>
   <div class="wrap">
     <h1><span class="dot" aria-hidden="true"></span>Padel rond Soest</h1>
-    <p>Wo &amp; do · start 20:00–21:00 · indoor dubbel</p>
+    <p id="summary">Indoor dubbel</p>
     <div class="status">
       <span id="checked">Laden…</span>
-      <button class="refresh" id="refresh" type="button">Vernieuwen</button>
+      <div class="buttons">
+        <button class="refresh" id="toggleSettings" type="button" aria-expanded="false" aria-controls="settings">Tijden</button>
+        <button class="refresh" id="refresh" type="button">Vernieuwen</button>
+      </div>
     </div>
   </div>
 </header>
 <main>
   <div class="wrap">
+    <section id="settings" class="day settings" hidden>
+      <h2>Tijden instellen</h2>
+      <p class="small">Geldt voor alle clubs. Indoor en dubbelbaan blijven altijd aan.</p>
+      <h3>Dagen</h3>
+      <div class="chips days" id="dayChips"></div>
+      <h3>Starttijden</h3>
+      <div class="chips times" id="timeChips"></div>
+      <h3>GitHub-token</h3>
+      <input class="field" id="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+      <p class="small" id="tokenInfo">Nodig om op te slaan; blijft alleen op dit toestel. Rechten: alleen repo padelbaan-scraper, <b>Actions: Read and write</b>.</p>
+      <button class="primary" id="save" type="button">Opslaan</button>
+      <p class="small" id="saveMsg" role="status"></p>
+    </section>
     <div id="days"><p class="msg">Beschikbaarheid ophalen…</p></div>
     <div class="how">
       <b>Zo boek je</b>
       <ol>
         <li><b>De Geeren</b>: Meet &amp; Play opent op padel, die avond. Kies de tijd → <b>Toevoegen</b> → afrekenen met <b>iDEAL | Wero</b>.</li>
         <li><b>Peakz</b>: de boekpagina opent op de juiste dag. Log in, kies tijd en baan en reken af.</li>
+        <li><b>Kees</b>: de boekpagina van Sportcentrum Kees opent. Kies padel, de datum en tijd, en reken af (kan ook in de Meet &amp; Play-app).</li>
         <li><b>Plaza Padel</b> (met *): wordt niet automatisch gecheckt. De link opent Playtomic; boeken en betalen gaat in de Playtomic-app.</li>
       </ol>
     </div>
@@ -114,6 +156,17 @@ const DATA_URLS = [
 ];
 const RUNS_URL = `https://api.github.com/repos/${REPO}/actions/workflows/padel-check.yml/runs?per_page=1&status=completed`;
 const MONTHS = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
+const DAY_SHORT = ["ma","di","wo","do","vr","za","zo"];
+const SETTINGS_DISPATCH = `https://api.github.com/repos/${REPO}/actions/workflows/settings.yml/dispatches`;
+const TOKEN_KEY = "padel_github_token";
+const ALL_TIMES = [];
+for (let m = 8 * 60; m <= 22 * 60; m += 30) ALL_TIMES.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
+let currentData = null;
+
+const store = {
+  get() { try { return localStorage.getItem(TOKEN_KEY) || ""; } catch { return ""; } },
+  set(v) { try { v ? localStorage.setItem(TOKEN_KEY, v) : localStorage.removeItem(TOKEN_KEY); } catch {} },
+};
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -159,9 +212,25 @@ async function fetchLastCheck() {
   } catch { return null; }
 }
 
+function toMin(t) { const [h, m] = t.split(":").map(Number); return h * 60 + m; }
+
+function summaryText(data) {
+  const days = (data.weekdays || []).map((d) => DAY_SHORT[d]);
+  const dayTxt = days.length === 7 ? "Elke dag" : days.length
+    ? (days.length > 1 ? days.slice(0, -1).join(", ") + " & " + days.at(-1) : days[0]) : "";
+  const times = data.start_times || [];
+  const contiguous = times.every((t, i) => i === 0 || toMin(t) - toMin(times[i - 1]) === 30);
+  const timeTxt = !times.length ? "" : times.length === 1 ? `start ${times[0]}`
+    : contiguous ? `start ${times[0]}–${times.at(-1)}` : `start ${times.join(", ")}`;
+  return [dayTxt.charAt(0).toUpperCase() + dayTxt.slice(1), timeTxt, "indoor dubbel"].filter(Boolean).join(" · ");
+}
+
 function render(data) {
+  currentData = data;
+  $("summary").textContent = summaryText(data);
   const today = todayIso();
-  const lateToday = new Date().getHours() * 60 + new Date().getMinutes() > 21 * 60; // na 21:00 is vandaag voorbij
+  const lastStart = Math.max(...(data.start_times || ["21:00"]).map(toMin));
+  const lateToday = new Date().getHours() * 60 + new Date().getMinutes() > lastStart; // laatste starttijd voorbij
   const days = data.days.filter((d) => d.iso > today || (d.iso === today && !lateToday));
   if (!days.length) {
     $("days").innerHTML = `<p class="msg">Geen woensdag of donderdag binnen het boekingsvenster.</p>`;
@@ -208,6 +277,78 @@ async function load() {
   }
 }
 
+function buildChips() {
+  $("dayChips").innerHTML = DAY_SHORT.map((d, i) =>
+    `<label class="chip"><input type="checkbox" name="day" value="${i}"><span>${d}</span></label>`).join("");
+  $("timeChips").innerHTML = ALL_TIMES.map((t) =>
+    `<label class="chip"><input type="checkbox" name="time" value="${t}"><span>${t}</span></label>`).join("");
+}
+
+function fillSettings() {
+  const days = new Set((currentData?.weekdays || [2, 3]).map(String));
+  const times = new Set(currentData?.start_times || ["20:00", "20:30", "21:00"]);
+  document.querySelectorAll('input[name="day"]').forEach((el) => { el.checked = days.has(el.value); });
+  document.querySelectorAll('input[name="time"]').forEach((el) => { el.checked = times.has(el.value); });
+  const saved = store.get();
+  $("token").value = "";
+  $("token").placeholder = saved ? "Token opgeslagen op dit toestel" : "github_pat_…";
+  $("tokenInfo").innerHTML = saved
+    ? 'Token staat op dit toestel. <button class="linkbtn" id="clearToken" type="button">Token wissen</button>'
+    : 'Nodig om op te slaan; blijft alleen op dit toestel. Rechten: alleen repo padelbaan-scraper, <b>Actions: Read and write</b>.';
+  $("clearToken")?.addEventListener("click", () => { store.set(""); fillSettings(); });
+  $("saveMsg").textContent = "";
+}
+
+async function saveSettings() {
+  const days = [...document.querySelectorAll('input[name="day"]:checked')].map((el) => el.value);
+  const times = [...document.querySelectorAll('input[name="time"]:checked')].map((el) => el.value);
+  const msg = $("saveMsg");
+  msg.classList.remove("err");
+  if (!days.length || !times.length) { msg.textContent = "Kies minstens één dag en één starttijd."; msg.classList.add("err"); return; }
+  const token = $("token").value.trim() || store.get();
+  if (!token) { msg.textContent = "Vul eerst je GitHub-token in."; msg.classList.add("err"); return; }
+  const btn = $("save");
+  btn.disabled = true; btn.textContent = "Opslaan…";
+  try {
+    const r = await fetch(SETTINGS_DISPATCH, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json",
+                 "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: "main", inputs: { weekdays: days.join(","), start_times: times.join(",") } }),
+    });
+    if (r.status === 204) {
+      store.set(token);
+      msg.textContent = "Opgeslagen! Over ongeveer een minuut zijn je nieuwe tijden actief; de lijst ververst vanzelf.";
+      setTimeout(load, 75000); setTimeout(load, 150000);
+      fillTokenOnly();
+    } else if (r.status === 401) {
+      msg.textContent = "Token klopt niet of is verlopen."; msg.classList.add("err");
+    } else if (r.status === 403 || r.status === 404) {
+      msg.textContent = "Token heeft geen toegang. Controleer: repo padelbaan-scraper, Actions: Read and write."; msg.classList.add("err");
+    } else {
+      msg.textContent = `Opslaan mislukt (fout ${r.status}).`; msg.classList.add("err");
+    }
+  } catch {
+    msg.textContent = "Geen verbinding met GitHub."; msg.classList.add("err");
+  } finally {
+    btn.disabled = false; btn.textContent = "Opslaan";
+  }
+}
+
+function fillTokenOnly() {
+  $("token").value = "";
+  $("token").placeholder = "Token opgeslagen op dit toestel";
+}
+
+buildChips();
+$("toggleSettings").addEventListener("click", () => {
+  const panel = $("settings");
+  const open = panel.hidden;
+  panel.hidden = !open;
+  $("toggleSettings").setAttribute("aria-expanded", String(open));
+  if (open) { fillSettings(); panel.scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
+$("save").addEventListener("click", saveSettings);
 $("refresh").addEventListener("click", load);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
 load();
