@@ -2,7 +2,8 @@
 """
 Checkt bij padelclubs rond Soest of er een indoor dubbelbaan (geen single court)
 vrij is op woensdag- of donderdagavond met begintijd 20:00, 20:30 of 21:00.
-Nieuwe vrije banen worden gemeld via een Slack Incoming Webhook, en
+Nieuwe vrije banen worden gemeld via Slack (Incoming Webhook) en als pushmelding
+via ntfy (app op je telefoon, geheim topic in NTFY_TOPIC), en
 docs/slots.json wordt bijgewerkt voor de PWA.
 
 Automatisch gecheckt:
@@ -15,8 +16,9 @@ Gebruik:
   python3 padel_check.py              # check en meld nieuwe vrije banen in Slack
   python3 padel_check.py --dry-run    # check en print alleen, geen Slack, niets opslaan
   python3 padel_check.py --test-slack # stuur een testbericht naar Slack
+  python3 padel_check.py --test-ntfy  # stuur een testpush naar de ntfy-app
 
-Configuratie: SLACK_WEBHOOK_URL in .env naast dit script (of als omgevingsvariabele).
+Configuratie: SLACK_WEBHOOK_URL en NTFY_TOPIC in .env naast dit script (of als omgevingsvariabelen).
 Alleen standaardbibliotheek, geen pip install nodig.
 """
 from __future__ import annotations
@@ -40,11 +42,11 @@ FAILURES_BEFORE_ALERT = 3                        # na zoveel mislukte runs op ri
 
 CLUBS = [
     {   # reserveren kan 10 dagen vooruit
-        "key": "degeeren", "name": "De Geeren Baarn", "provider": "meetandplay",
+        "key": "degeeren", "name": "De Geeren Baarn", "short": "Geeren", "provider": "meetandplay",
         "days_ahead": 10, "club_url": "https://meetandplay.nl/club/88192",
     },
     {   # Peakz Padel CUPRA Padel Dome, Middelhoefseweg 10
-        "key": "peakz-amersfoort", "name": "Peakz Amersfoort", "provider": "foys",
+        "key": "peakz-amersfoort", "name": "Peakz Amersfoort", "short": "Peakz", "provider": "foys",
         "days_ahead": 14,
         "organisation_id": "df82f4dd-fd87-4af5-9c2f-656fe1a44357",
         "location_id": "527bd7b9-d8d3-4c43-a2cb-997e5baa0527",
@@ -242,7 +244,7 @@ def merge_durations(raw: list[dict], club: dict) -> list[dict]:
         items.sort(key=lambda s: s["duration"])
         first = items[0]
         out.append({
-            "club": club["name"], "club_key": club["key"],
+            "club": club["name"], "club_key": club["key"], "club_short": club["short"],
             "date": day.strftime("%d-%m-%Y"), "iso": day.isoformat(),
             "weekday": WEEKDAYS[day.weekday()], "start": start,
             "time": first["time"], "court": court,
@@ -292,6 +294,45 @@ def send_slack(text: str) -> None:
             raise RuntimeError(f"Slack gaf status {r.status}")
 
 
+def send_ntfy(title: str, message: str, click: str | None = None,
+              actions: list[dict] | None = None, priority: int = 4, tags: list[str] | None = None) -> bool:
+    """Pushmelding via ntfy.sh naar het geheime topic in NTFY_TOPIC. Geeft False als niet ingesteld."""
+    topic = os.environ.get("NTFY_TOPIC")
+    if not topic:
+        return False
+    body = {"topic": topic, "title": title, "message": message, "priority": priority,
+            "tags": tags or ["tennis"]}
+    if click:
+        body["click"] = click
+    if actions:
+        body["actions"] = actions[:3]          # ntfy staat max. 3 knoppen toe
+    req = urllib.request.Request("https://ntfy.sh/", data=json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        if r.status != 200:
+            raise RuntimeError(f"ntfy gaf status {r.status}")
+    return True
+
+
+def ntfy_new_slots(slots: list[dict], send=None) -> None:
+    slots = sorted(slots, key=sort_key)
+    lines = [f'{s["weekday"][:2]} {nice_date(s["iso"])} {s["start"]} · {s["club"]} · {s["court"]}'
+             for s in slots]
+    clubs = sorted({s["club"] for s in slots})
+    # één club en één dag: direct naar de boekpagina; anders naar de app met het overzicht
+    same_page = len({s["booking_url"] for s in slots}) == 1
+    click = slots[0]["booking_url"] if same_page else PWA_URL
+    actions = []
+    for s in slots:
+        if all(a["url"] != s["booking_url"] for a in actions):
+            actions.append({"action": "view", "label": f'Boek {s["club_short"]} {nice_date(s["iso"])}',
+                            "url": s["booking_url"], "clear": True})
+    actions = actions[:2] + [{"action": "view", "label": "Open app", "url": PWA_URL}]
+    title = (f"Padelbaan vrij bij {clubs[0]}" if len(clubs) == 1 else "Padelbanen vrij") \
+        + (f" ({len(slots)})" if len(slots) > 1 else "")
+    (send or send_ntfy)(title, "\n".join(lines), click=click, actions=actions)
+
+
 def nice_date(iso: str) -> str:
     d = dt.date.fromisoformat(iso)
     return f"{d.day} {NL_MONTHS[d.month - 1]}"
@@ -337,6 +378,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true", help="niet naar Slack sturen, niets opslaan")
     ap.add_argument("--test-slack", action="store_true", help="stuur een testbericht naar Slack")
+    ap.add_argument("--test-ntfy", action="store_true", help="stuur een testpush via ntfy")
     args = ap.parse_args()
     load_env()
 
@@ -344,6 +386,12 @@ def main() -> int:
         send_slack(":white_check_mark: Testbericht van de padelbaan-checker.")
         log("Testbericht verstuurd")
         return 0
+    if args.test_ntfy:
+        ok = send_ntfy("Padel-checker werkt", "Testmelding: zo ziet een push eruit als er een baan vrijkomt.",
+                       click=PWA_URL, actions=[{"action": "view", "label": "Open app", "url": PWA_URL}],
+                       tags=["white_check_mark"])
+        log("Testpush verstuurd" if ok else "NTFY_TOPIC ontbreekt (zet hem in .env)")
+        return 0 if ok else 1
 
     state = load_state()
     seen = set(state.get("available", []))
@@ -378,12 +426,22 @@ def main() -> int:
     if args.dry_run:
         if new:
             print("\n--- Slack-bericht (niet verstuurd) ---\n" + format_message(new))
+            ntfy_new_slots(new, send=lambda title, message, **kw: print(
+                "\n--- Push (niet verstuurd) ---\n"
+                + json.dumps({"title": title, "message": message, **kw}, indent=1, ensure_ascii=False)))
         for a in alerts:
             print(a)
         return 0
 
     write_slots_file(slots, failed)
     if new:
+        # Push eerst; een mislukte push mag de Slack-melding niet tegenhouden.
+        try:
+            if os.environ.get("NTFY_TOPIC"):
+                ntfy_new_slots(new)
+                log("Pushmelding (ntfy) verstuurd")
+        except Exception as e:
+            log(f"Pushmelding mislukt: {e!r}")
         send_slack(format_message(new))
         log("Slack-melding verstuurd")
     for a in alerts:
@@ -391,6 +449,11 @@ def main() -> int:
             send_slack(a)
         except Exception as e:
             log(f"Slack-waarschuwing mislukt: {e!r}")
+        try:
+            send_ntfy("Padel-checker: probleem", a.replace(":warning: ", "").replace("`", ""),
+                      priority=3, tags=["warning"])
+        except Exception as e:
+            log(f"Push-waarschuwing mislukt: {e!r}")
     # Onthoud wat nu vrij is; een baan die weer bezet raakt en later vrijkomt wordt opnieuw gemeld.
     state["available"] = sorted(set(current) | keep)
     state.pop("last_run", None)

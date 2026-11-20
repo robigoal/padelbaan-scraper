@@ -28,6 +28,7 @@ jobs:
         continue-on-error: true
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 padel_check.py
 
       - name: State opslaan

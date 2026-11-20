@@ -15,6 +15,11 @@ De Slack Incoming Webhook staat als repository secret `SLACK_WEBHOOK_URL`.
   of `gh workflow run padel-check.yml`.
 - Pauzeren: `gh workflow disable padel-check.yml` (weer aan: `enable`).
 
+## Pushmeldingen (ntfy)
+Naast Slack stuurt het script bij nieuwe vrije banen een push via [ntfy](https://ntfy.sh).
+Installeer de ntfy-app en abonneer je op het geheime topic uit `.env` (`NTFY_TOPIC`, ook
+repository secret). Test: `python3 padel_check.py --test-ntfy`.
+
 ## App op je telefoon (PWA)
 https://robigoal.github.io/padelbaan-scraper/ — toont de vrije banen uit `docs/slots.json`
 met per baan een **Boek**-knop naar de boekpagina van die club op de juiste datum.
