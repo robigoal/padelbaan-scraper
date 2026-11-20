@@ -104,6 +104,8 @@
     font-weight: 700; font-size: 17px; background: var(--ball); color: var(--btn-text); cursor: pointer;
   }
   .primary:disabled { opacity: .6; }
+  .tokenrow { display: flex; gap: 10px; align-items: center; }
+  .tokenrow .field { flex: 1; min-width: 0; }
   .linkbtn { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
 </style>
 </head>
@@ -131,7 +133,10 @@
       <h3>Starttijden</h3>
       <div class="chips times" id="timeChips"></div>
       <h3>GitHub-token</h3>
-      <input class="field" id="token" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+      <div class="tokenrow">
+        <input class="field" id="token" type="password" name="padel-token" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="github_pat_…">
+        <button class="linkbtn" id="showToken" type="button">Toon</button>
+      </div>
       <p class="small" id="tokenInfo">Nodig om op te slaan; blijft alleen op dit toestel. Rechten: alleen repo padelbaan-scraper, <b>Actions: Read and write</b>.</p>
       <button class="primary" id="save" type="button">Opslaan</button>
       <p class="small" id="saveMsg" role="status"></p>
@@ -308,8 +313,13 @@ async function saveSettings() {
   const msg = $("saveMsg");
   msg.classList.remove("err");
   if (!days.length || !times.length) { msg.textContent = "Kies minstens één dag en één starttijd."; msg.classList.add("err"); return; }
-  const token = $("token").value.trim() || store.get();
+  const typed = cleanToken($("token").value);
+  const token = typed || store.get();
   if (!token) { msg.textContent = "Vul eerst je GitHub-token in."; msg.classList.add("err"); return; }
+  if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(token)) {
+    msg.textContent = `Dit lijkt geen GitHub-token (${describeToken(token)}). Een token begint met "github_pat_".`;
+    msg.classList.add("err"); return;
+  }
   const btn = $("save");
   btn.disabled = true; btn.textContent = "Opslaan…";
   try {
@@ -325,9 +335,12 @@ async function saveSettings() {
       setTimeout(load, 75000); setTimeout(load, 150000);
       fillTokenOnly();
     } else if (r.status === 401) {
-      msg.textContent = "Token klopt niet of is verlopen."; msg.classList.add("err");
+      if (!typed) store.set("");   // opgeslagen token werkt niet meer: wissen
+      msg.textContent = `GitHub accepteert dit token niet (${describeToken(token)}). Is het verlopen of onvolledig gekopieerd?`;
+      msg.classList.add("err");
     } else if (r.status === 403 || r.status === 404) {
-      msg.textContent = "Token heeft geen toegang. Controleer: repo padelbaan-scraper, Actions: Read and write."; msg.classList.add("err");
+      msg.textContent = `Token heeft geen toegang (fout ${r.status}). Controleer: repo padelbaan-scraper, Actions: Read and write.`;
+      msg.classList.add("err");
     } else {
       msg.textContent = `Opslaan mislukt (fout ${r.status}).`; msg.classList.add("err");
     }
@@ -336,6 +349,17 @@ async function saveSettings() {
   } finally {
     btn.disabled = false; btn.textContent = "Opslaan";
   }
+}
+
+// Haalt plakfouten weg: "Bearer " ervoor, spaties/regeleinden, aanhalingstekens.
+function cleanToken(raw) {
+  return String(raw || "").replace(/^\s*(authorization:\s*)?bearer\s+/i, "").replace(/["'\s]/g, "");
+}
+
+function describeToken(tok) {
+  if (!tok) return "leeg";
+  const hint = tok.startsWith("github_pat_") && tok.length !== 93 ? "; een volledig token heeft meestal 93 tekens" : "";
+  return `begint met "${tok.slice(0, 15)}…", ${tok.length} tekens${hint}`;
 }
 
 function fillTokenOnly() {
@@ -352,6 +376,10 @@ $("toggleSettings").addEventListener("click", () => {
   if (open) { fillSettings(); panel.scrollIntoView({ behavior: "smooth", block: "start" }); }
 });
 $("save").addEventListener("click", saveSettings);
+$("showToken").addEventListener("click", () => {
+  const f = $("token"); const show = f.type === "password";
+  f.type = show ? "text" : "password"; $("showToken").textContent = show ? "Verberg" : "Toon";
+});
 $("refresh").addEventListener("click", load);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
 load();
