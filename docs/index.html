@@ -150,9 +150,12 @@
 </main>
 <script>
 const REPO = "robigoal/padelbaan-scraper";
+// Eerst de GitHub API (altijd actueel); raw.githubusercontent en Pages cachen tot 5-10 min.
 const DATA_URLS = [
-  `https://raw.githubusercontent.com/${REPO}/main/docs/slots.json`,
-  "slots.json",
+  { url: `https://api.github.com/repos/${REPO}/contents/docs/slots.json?ref=main`,
+    headers: { Accept: "application/vnd.github.raw+json" } },
+  { url: `https://raw.githubusercontent.com/${REPO}/main/docs/slots.json` },
+  { url: "slots.json" },
 ];
 const RUNS_URL = `https://api.github.com/repos/${REPO}/actions/workflows/padel-check.yml/runs?per_page=1&status=completed`;
 const MONTHS = ["jan","feb","mrt","apr","mei","jun","jul","aug","sep","okt","nov","dec"];
@@ -192,10 +195,10 @@ function ago(date) {
 
 async function fetchData() {
   let lastErr;
-  for (const url of DATA_URLS) {
+  for (const { url, headers } of DATA_URLS) {
     try {
       const sep = url.includes("?") ? "&" : "?";
-      const r = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store" });
+      const r = await fetch(`${url}${sep}t=${Date.now()}`, { cache: "no-store", headers: headers || {} });
       if (r.ok) return await r.json();
       lastErr = new Error(`HTTP ${r.status}`);
     } catch (e) { lastErr = e; }
