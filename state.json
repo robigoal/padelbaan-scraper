@@ -8,5 +8,10 @@
     "peakz-amersfoort 02-12-2026 21:00 Baan 3",
     "peakz-amersfoort 02-12-2026 21:00 Pon Centre Court"
   ],
-  "failures": {}
+  "failures": {},
+  "push_pending": [
+    "kees-bilthoven 03-12-2026 21:00 Dubbelbaan indoor",
+    "kees-bilthoven 10-12-2026 21:00 Dubbelbaan indoor",
+    "kees-bilthoven 26-11-2026 21:00 Dubbelbaan indoor"
+  ]
 }

@@ -33,6 +33,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -386,12 +388,22 @@ def send_ntfy(title: str, message: str, click: str | None = None,
         body["click"] = click
     if actions:
         body["actions"] = actions[:3]          # ntfy staat max. 3 knoppen toe
-    req = urllib.request.Request("https://ntfy.sh/", data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        if r.status != 200:
-            raise RuntimeError(f"ntfy gaf status {r.status}")
-    return True
+    data = json.dumps(body).encode()
+    # ntfy.sh beperkt berichten per IP; GitHub-runners delen IP's, dus bij 429/5xx even wachten.
+    for attempt, wait in enumerate([5, 15, 30, None]):
+        try:
+            req = urllib.request.Request("https://ntfy.sh/", data=data,
+                                         headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                if r.status == 200:
+                    return True
+                raise RuntimeError(f"ntfy gaf status {r.status}")
+        except urllib.error.HTTPError as e:
+            if wait is None or (e.code != 429 and e.code < 500):
+                raise
+            log(f"  ntfy gaf {e.code}, nieuwe poging over {wait}s")
+            time.sleep(wait)
+    return False
 
 
 def ntfy_new_slots(slots: list[dict], send=None, title_prefix: str = "") -> None:
@@ -527,14 +539,20 @@ def main() -> int:
         return 0
 
     write_slots_file(slots, failed)
-    if new:
-        # Push eerst; een mislukte push mag de Slack-melding niet tegenhouden.
+    # Push: nieuwe banen + banen waarvan de push eerder mislukte (als ze nog vrij zijn).
+    pending = [k for k in state.get("push_pending", []) if k in current and k not in new_keys]
+    to_push = new + [current[k] for k in pending]
+    if to_push and os.environ.get("NTFY_TOPIC"):
         try:
-            if os.environ.get("NTFY_TOPIC"):
-                ntfy_new_slots(new)
-                log("Pushmelding (ntfy) verstuurd")
-        except Exception as e:
-            log(f"Pushmelding mislukt: {e!r}")
+            ntfy_new_slots(to_push)
+            log(f"Pushmelding (ntfy) verstuurd ({len(to_push)} baan/banen)")
+            state.pop("push_pending", None)
+        except Exception as e:  # een mislukte push mag de Slack-melding niet tegenhouden
+            log(f"Pushmelding mislukt, volgende run opnieuw: {e!r}")
+            state["push_pending"] = sorted(slot_key(s) for s in to_push)
+    elif not to_push:
+        state.pop("push_pending", None)
+    if new:
         send_slack(format_message(new))
         log("Slack-melding verstuurd")
     for a in alerts:
