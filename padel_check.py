@@ -314,7 +314,7 @@ def send_ntfy(title: str, message: str, click: str | None = None,
     return True
 
 
-def ntfy_new_slots(slots: list[dict], send=None) -> None:
+def ntfy_new_slots(slots: list[dict], send=None, title_prefix: str = "") -> None:
     slots = sorted(slots, key=sort_key)
     lines = [f'{s["weekday"][:2]} {nice_date(s["iso"])} {s["start"]} · {s["club"]} · {s["court"]}'
              for s in slots]
@@ -330,7 +330,7 @@ def ntfy_new_slots(slots: list[dict], send=None) -> None:
     actions = actions[:2] + [{"action": "view", "label": "Open app", "url": PWA_URL}]
     title = (f"Padelbaan vrij bij {clubs[0]}" if len(clubs) == 1 else "Padelbanen vrij") \
         + (f" ({len(slots)})" if len(slots) > 1 else "")
-    (send or send_ntfy)(title, "\n".join(lines), click=click, actions=actions)
+    (send or send_ntfy)(title_prefix + title, "\n".join(lines), click=click, actions=actions)
 
 
 def nice_date(iso: str) -> str:
@@ -387,11 +387,24 @@ def main() -> int:
         log("Testbericht verstuurd")
         return 0
     if args.test_ntfy:
-        ok = send_ntfy("Padel-checker werkt", "Testmelding: zo ziet een push eruit als er een baan vrijkomt.",
-                       click=PWA_URL, actions=[{"action": "view", "label": "Open app", "url": PWA_URL}],
-                       tags=["white_check_mark"])
-        log("Testpush verstuurd" if ok else "NTFY_TOPIC ontbreekt (zet hem in .env)")
-        return 0 if ok else 1
+        # Testpush in het echte formaat, met de banen die nu vrij zijn (zonder state aan te passen).
+        if not os.environ.get("NTFY_TOPIC"):
+            log("NTFY_TOPIC ontbreekt (zet hem in .env of als secret)")
+            return 1
+        current = []
+        for club in CLUBS:
+            try:
+                current += merge_durations(PROVIDERS[club["provider"]](club), club)
+            except Exception as e:
+                log(f"  {club['name']}: FOUT {e!r}")
+        if current:
+            ntfy_new_slots(current, title_prefix="TEST · ")
+        else:
+            send_ntfy("TEST · Padel-checker werkt", "Er is nu geen geschikte baan vrij; zo komt een push binnen.",
+                      click=PWA_URL, actions=[{"action": "view", "label": "Open app", "url": PWA_URL}],
+                      tags=["white_check_mark"])
+        log(f"Testpush verstuurd ({len(current)} vrije baan/banen)")
+        return 0
 
     state = load_state()
     seen = set(state.get("available", []))
