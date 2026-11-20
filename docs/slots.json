@@ -8,9 +8,7 @@
     "20:30",
     "21:00"
   ],
-  "errors": [
-    "Kees Bilthoven"
-  ],
+  "errors": [],
   "days": [
     {
       "date": "25-11-2026",
@@ -59,7 +57,17 @@
       "date": "26-11-2026",
       "iso": "2026-11-26",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "De Geeren Baarn",
@@ -148,7 +156,17 @@
       "date": "03-12-2026",
       "iso": "2026-12-03",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "Peakz Amersfoort",
@@ -199,7 +217,17 @@
       "date": "10-12-2026",
       "iso": "2026-12-10",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "Kees Bilthoven",

@@ -8,7 +8,5 @@
     "peakz-amersfoort 02-12-2026 21:00 Baan 3",
     "peakz-amersfoort 02-12-2026 21:00 Pon Centre Court"
   ],
-  "failures": {
-    "kees-bilthoven": 1
-  }
+  "failures": {}
 }
