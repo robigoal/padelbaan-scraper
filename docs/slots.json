@@ -121,6 +121,11 @@
       ],
       "links": [
         {
+          "club": "De Geeren Baarn",
+          "url": "https://meetandplay.nl/club/88192?date=02-12-2026&sport=padel&dayPart=evening",
+          "auto": true
+        },
+        {
           "club": "Peakz Amersfoort",
           "url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-12-02&location=cupra-padel-dome",
           "auto": true
