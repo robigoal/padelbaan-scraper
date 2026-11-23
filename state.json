@@ -6,7 +6,5 @@
     "peakz-amersfoort 02-12-2026 21:00 Baan 2",
     "peakz-amersfoort 02-12-2026 21:00 Pon Centre Court"
   ],
-  "failures": {
-    "peakz-amersfoort": 1
-  }
+  "failures": {}
 }
