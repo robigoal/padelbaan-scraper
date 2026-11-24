@@ -205,6 +205,11 @@
       "slots": [],
       "links": [
         {
+          "club": "Peakz Amersfoort",
+          "url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-12-09&location=cupra-padel-dome",
+          "auto": true
+        },
+        {
           "club": "Kees Bilthoven",
           "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
           "auto": true
@@ -226,6 +231,57 @@
       "iso": "2026-12-10",
       "weekday": "donderdag",
       "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
+      "links": [
+        {
+          "club": "Kees Bilthoven",
+          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
+          "auto": true
+        },
+        {
+          "club": "Plaza Padel Amersfoort",
+          "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
+          "auto": false
+        },
+        {
+          "club": "Plaza Padel Laren",
+          "url": "https://playtomic.com/clubs/plaza-padel-laren",
+          "auto": false
+        }
+      ]
+    },
+    {
+      "date": "16-12-2026",
+      "iso": "2026-12-16",
+      "weekday": "woensdag",
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "20:00",
+          "time": "20:00 - 21:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        },
+        {
+          "club": "Kees Bilthoven",
+          "start": "20:30",
+          "time": "20:30 - 21:30",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        },
         {
           "club": "Kees Bilthoven",
           "start": "21:00",
