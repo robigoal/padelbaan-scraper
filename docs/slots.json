@@ -14,17 +14,7 @@
       "date": "25-11-2026",
       "iso": "2026-11-25",
       "weekday": "woensdag",
-      "slots": [
-        {
-          "club": "De Geeren Baarn",
-          "start": "20:00",
-          "time": "20:00 - 21:30",
-          "durations": "90 min",
-          "court": "P1 Zinineenbroodje.nl Padelbaan",
-          "price": "€ 56,25",
-          "booking_url": "https://meetandplay.nl/club/88192?date=25-11-2026&sport=padel&dayPart=evening"
-        }
-      ],
+      "slots": [],
       "links": [
         {
           "club": "De Geeren Baarn",
@@ -188,15 +178,6 @@
           "court": "P4 Heineken 0.0 Padelbaan 4",
           "price": "€ 37,50",
           "booking_url": "https://meetandplay.nl/club/88192?date=03-12-2026&sport=padel&dayPart=evening"
-        },
-        {
-          "club": "Kees Bilthoven",
-          "start": "21:00",
-          "time": "21:00 - 22:00",
-          "durations": "60/90 min",
-          "court": "Dubbelbaan indoor",
-          "price": "€ 40,00 (60 min)",
-          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
         }
       ],
       "links": [
