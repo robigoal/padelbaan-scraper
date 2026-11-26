@@ -14,7 +14,17 @@
       "date": "26-11-2026",
       "iso": "2026-11-26",
       "weekday": "donderdag",
-      "slots": [],
+      "slots": [
+        {
+          "club": "Kees Bilthoven",
+          "start": "21:00",
+          "time": "21:00 - 22:00",
+          "durations": "60/90 min",
+          "court": "Dubbelbaan indoor",
+          "price": "€ 40,00 (60 min)",
+          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
+        }
+      ],
       "links": [
         {
           "club": "De Geeren Baarn",
