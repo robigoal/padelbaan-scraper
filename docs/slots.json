@@ -47,17 +47,7 @@
       "date": "02-12-2026",
       "iso": "2026-12-02",
       "weekday": "woensdag",
-      "slots": [
-        {
-          "club": "Peakz Amersfoort",
-          "start": "21:00",
-          "time": "21:00 - 22:00",
-          "durations": "60/120 min",
-          "court": "Pon Centre Court",
-          "price": "€ 38,00 (60 min)",
-          "booking_url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-12-02&location=cupra-padel-dome"
-        }
-      ],
+      "slots": [],
       "links": [
         {
           "club": "De Geeren Baarn",
