@@ -11,39 +11,6 @@
   "errors": [],
   "days": [
     {
-      "date": "26-11-2026",
-      "iso": "2026-11-26",
-      "weekday": "donderdag",
-      "slots": [],
-      "links": [
-        {
-          "club": "De Geeren Baarn",
-          "url": "https://meetandplay.nl/club/88192?date=26-11-2026&sport=padel&dayPart=evening",
-          "auto": true
-        },
-        {
-          "club": "Peakz Amersfoort",
-          "url": "https://www.peakzpadel.nl/reserveren/court-booking/reservation?daypart=---&date=2026-11-26&location=cupra-padel-dome",
-          "auto": true
-        },
-        {
-          "club": "Kees Bilthoven",
-          "url": "https://sportcentrumkees.bookaball.com/nl/bookings/create",
-          "auto": true
-        },
-        {
-          "club": "Plaza Padel Amersfoort",
-          "url": "https://playtomic.com/clubs/plaza-padel-amersfoort",
-          "auto": false
-        },
-        {
-          "club": "Plaza Padel Laren",
-          "url": "https://playtomic.com/clubs/plaza-padel-laren",
-          "auto": false
-        }
-      ]
-    },
-    {
       "date": "02-12-2026",
       "iso": "2026-12-02",
       "weekday": "woensdag",
