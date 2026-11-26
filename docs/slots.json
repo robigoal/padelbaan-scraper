@@ -101,15 +101,6 @@
           "booking_url": "https://meetandplay.nl/club/88192?date=03-12-2026&sport=padel&dayPart=evening"
         },
         {
-          "club": "De Geeren Baarn",
-          "start": "21:00",
-          "time": "21:00 - 22:00",
-          "durations": "60 min",
-          "court": "P4 Heineken 0.0 Padelbaan 4",
-          "price": "€ 37,50",
-          "booking_url": "https://meetandplay.nl/club/88192?date=03-12-2026&sport=padel&dayPart=evening"
-        },
-        {
           "club": "Kees Bilthoven",
           "start": "21:00",
           "time": "21:00 - 22:00",
