@@ -224,15 +224,6 @@
       "slots": [
         {
           "club": "Kees Bilthoven",
-          "start": "20:00",
-          "time": "20:00 - 21:00",
-          "durations": "60/90 min",
-          "court": "Dubbelbaan indoor",
-          "price": "€ 40,00 (60 min)",
-          "booking_url": "https://sportcentrumkees.bookaball.com/nl/bookings/create"
-        },
-        {
-          "club": "Kees Bilthoven",
           "start": "20:30",
           "time": "20:30 - 21:30",
           "durations": "60/90 min",
